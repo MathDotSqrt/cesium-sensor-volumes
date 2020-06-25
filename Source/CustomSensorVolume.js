@@ -236,7 +236,7 @@ define([
             }
         };
 
-        this._mode = SceneMode.SCENE3D;
+        this._mode = SceneMode.SCENE2D;
     };
 
     Object.defineProperties(CustomSensorVolume.prototype, {
@@ -363,8 +363,10 @@ define([
      */
     CustomSensorVolume.prototype.update = function(frameState) {
         this._mode = frameState.mode;
-        if (!this.show || this._mode !== SceneMode.SCENE3D) {
-            return;
+	console.log(frameState.mode);
+        //if (!this.show || this._mode !== SceneMode.SCENE3D) {
+        if (!this.show) {
+	    return;
         }
 
         var context = frameState.context;
