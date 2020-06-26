@@ -11,11 +11,10 @@ vec4 computePosition(vec4 position3D){
 	if(czm_sceneMode == czm_sceneMode3D){
 		return p;
 	}
-
 	float radius = length(p.xyz);
 	float lat = asin(p.z / radius) * 40075000. / ( 2. * 3.14159);
 	float lon = atan(p.y, p.x) * 40075000. / (2. * 3.14159);
-	return vec4(radius / 10., lon, lat, 1);
+	return vec4(radius - 6371000., lon, lat, 1);
 }
 
 void main()
