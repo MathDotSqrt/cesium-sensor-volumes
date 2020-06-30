@@ -105,7 +105,7 @@ vec3 projectPointOnEllipsoid(vec3 world_pos){
 	bool is_intersecting = discriminant > 0.;
 	bool is_not_sensor_origin = a > .001;
 
-	return is_intersecting ? projected_point : world_pos;
+	return is_intersecting && (t > 0.) ? projected_point : world_pos;
 }
 
 vec3 computeScenePosition(vec3 world_pos){
