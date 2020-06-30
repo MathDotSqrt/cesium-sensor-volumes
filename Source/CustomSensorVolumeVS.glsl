@@ -8,42 +8,6 @@ varying vec3 v_normalEC;
 const float EARTH_RADIUS_MAX = 6378137.;	//max radius of the earth
 const float EARTH_RADIUS_MIN = 6356752.314; 	//min radius of the earth
 
-float geocentricRadius(float lat){
-	const float a = EARTH_RADIUS_MAX;
-	const float a2 = a * a;
-	const float b = EARTH_RADIUS_MIN;
-	const float b2 = b * b;
-
-	float sin_lat = sin(lat);
-	float cos_lat = cos(lat);
-
-	float a2_cos_lat = a2 * cos_lat;
-	float a2_cos_lat2 = a2_cos_lat * a2_cos_lat;
-
-	float b2_sin_lat = b2 * sin_lat;
-	float b2_sin_lat2 = b2_sin_lat * b2_sin_lat;
-
-	float a_cos_lat = a * cos_lat;
-	float a_cos_lat2 = a_cos_lat * a_cos_lat;
-
-	float b_sin_lat = b * sin_lat;
-	float b_sin_lat2 = b_sin_lat * b_sin_lat;
-
-	return sqrt((a2_cos_lat2 + b2_sin_lat2) / (a_cos_lat2 + b_sin_lat2));
-}
-
-vec3 cartesian2Spherical(vec3 cartesian){
-	float radius = length(cartesian);
-	float lat = asin(cartesian.z / radius);
-	float lon = atan(cartesian.y, cartesian.x);
-
-	float earth_radius = geocentricRadius(lat);
-	float alt = radius - earth_radius;
-
-	return vec3(alt, lon, lat);
-
-}
-
 //https://www.mathworks.com/matlabcentral/fileexchange/7941-convert-cartesian-ecef-coordinates-to-lat-lon-alt
 vec3 ecef2all(vec3 ecef){
 	const float a = EARTH_RADIUS_MAX;
@@ -74,16 +38,38 @@ vec3 ecef2all(vec3 ecef){
 
 	float alt = p / cos(lat) - N;
 
+	//lon = mod(lon, czm_twoPi);
+
 	const float PI = 3.14159;
 	return vec3(alt, lon, lat);
 }
 
 vec3 computeEquirectangular(vec3 world_pos){
+	vec3 origin = czm_model[3].xyz;
+	vec3 all_origin = ecef2all(origin);
+
 	vec3 all = ecef2all(world_pos);
 	float alt = all.x;
 	float lon = all.y;
 	float lat = all.z;
+
+	float lon_right = mod(lon, czm_twoPi);
+	float lon_left = lon_right - czm_twoPi;
+
+	lon = origin.y > 3. ? lon_right : lon;
+	lon = origin.y < -3. ? lon_left : lon;
+
 	return vec3(alt, lon * EARTH_RADIUS_MAX, lat * EARTH_RADIUS_MAX);
+}
+
+vec3 computeScenePosition(vec3 world_pos){
+	if(czm_sceneMode == czm_sceneMode3D){
+		return world_pos;
+	}
+
+	vec3 projected_pos = computeEquirectangular(world_pos);
+
+	return mix(projected_pos, world_pos, czm_morphTime);
 }
 
 vec3 projectPointOnEllipsoid(vec3 world_pos){
@@ -93,7 +79,7 @@ vec3 projectPointOnEllipsoid(vec3 world_pos){
 	vec3 slope = world_pos - sensor_origin_wc;
 	float a = dot(slope, slope);
 	float b = -2. * dot(slope, -sensor_origin_wc);
-	float c = dot(sensor_origin_wc, sensor_origin_wc) - EARTH_RADIUS_MAX * EARTH_RADIUS_MAX;
+	float c = dot(sensor_origin_wc, sensor_origin_wc) - EARTH_RADIUS_MIN * EARTH_RADIUS_MIN;
 
 	float discriminant = b * b - 4. * a * c;
 	float t1 = (-b + sqrt(discriminant)) / (2. * a);
@@ -106,16 +92,6 @@ vec3 projectPointOnEllipsoid(vec3 world_pos){
 	bool is_not_sensor_origin = a > .001;
 
 	return is_intersecting && (t > 0.) ? projected_point : world_pos;
-}
-
-vec3 computeScenePosition(vec3 world_pos){
-	if(czm_sceneMode == czm_sceneMode3D){
-		return world_pos;
-	}
-
-	vec3 projected_pos = computeEquirectangular(world_pos);
-
-	return mix(projected_pos, world_pos, czm_morphTime);
 }
 
 void main()
