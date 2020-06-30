@@ -16,7 +16,7 @@ float geocentricRadius(float lat){
 
 	float sin_lat = sin(lat);
 	float cos_lat = cos(lat);
-	
+
 	float a2_cos_lat = a2 * cos_lat;
 	float a2_cos_lat2 = a2_cos_lat * a2_cos_lat;
 
@@ -41,7 +41,7 @@ vec3 cartesian2Spherical(vec3 cartesian){
 	float alt = radius - earth_radius;
 
 	return vec3(alt, lon, lat);
-	
+
 }
 
 //https://www.mathworks.com/matlabcentral/fileexchange/7941-convert-cartesian-ecef-coordinates-to-lat-lon-alt
@@ -74,52 +74,63 @@ vec3 ecef2all(vec3 ecef){
 
 	float alt = p / cos(lat) - N;
 
+	const float PI = 3.14159;
 	return vec3(alt, lon, lat);
 }
 
-vec4 computeEquirectangular(vec4 world_pos){
-	vec3 all = ecef2all(world_pos.xyz);
-	
-	//float radius = length(world_pos.xyzw);
-	//float lat = asin(world_pos.z / radius) * EARTH_RADIUS ;
-	//float lon = atan(world_pos.y, world_pos.x) * EARTH_RADIUS;
-
-	return vec4(all.x, all.y * EARTH_RADIUS_MAX, all.z * EARTH_RADIUS_MAX, 1);
-
-	//world_pos.x *= 3.;
-	//world_pos.y *= 3.;
-	//world_pos.z *= 3.;
-	
-
-	//return world_pos;
+vec3 computeEquirectangular(vec3 world_pos){
+	vec3 all = ecef2all(world_pos);
+	float alt = all.x;
+	float lon = all.y;
+	float lat = all.z;
+	return vec3(alt, lon * EARTH_RADIUS_MAX, lat * EARTH_RADIUS_MAX);
 }
 
-vec4 computePosition(vec4 position3D){
-	
-	vec4 p = czm_model * position3D;
+vec3 projectPointOnEllipsoid(vec3 world_pos){
+	vec3 sensor_origin_wc = czm_model[3].xyz;
+
+	//http://www.ambrsoft.com/TrigoCalc/Sphere/SpherLineIntersection_.htm
+	vec3 slope = world_pos - sensor_origin_wc;
+	float a = dot(slope, slope);
+	float b = -2. * dot(slope, -sensor_origin_wc);
+	float c = dot(sensor_origin_wc, sensor_origin_wc) - EARTH_RADIUS_MAX * EARTH_RADIUS_MAX;
+
+	float discriminant = b * b - 4. * a * c;
+	float t1 = (-b + sqrt(discriminant)) / (2. * a);
+	float t2 = (-b - sqrt(discriminant)) / (2. * a);
+	float t = min(t1, t2);	//slightly elongate to account for error
+
+	vec3 projected_point = sensor_origin_wc + slope * t;
+	//if a is 0 then it is the same point as sensor origin
+	bool is_intersecting = discriminant > 0.;
+	bool is_not_sensor_origin = a > .001;
+
+	return is_intersecting ? projected_point : world_pos;
+}
+
+vec3 computeScenePosition(vec3 world_pos){
 	if(czm_sceneMode == czm_sceneMode3D){
-		return p;
+		return world_pos;
 	}
 
+	vec3 projected_pos = computeEquirectangular(world_pos);
 
-	vec4 projected_pos = computeEquirectangular(p);
-
-	return mix(projected_pos, p, czm_morphTime);
-	//return p;
+	return mix(projected_pos, world_pos, czm_morphTime);
 }
 
 void main()
 {
+	vec4 world_pos = czm_model * position;
+	vec3 projected_world_pos = projectPointOnEllipsoid(world_pos.xyz);
+  vec3 scene_wc = computeScenePosition(projected_world_pos);
 
-    vec4 world_pos = computePosition(position);
 
+  gl_Position = czm_viewProjection * vec4(scene_wc, 1.);
 
-    gl_Position = czm_viewProjection * world_pos;
-    
-    //Use regular transformation to trick the sensor into thinking its in 3d space
-    //The fragment calculation turns out to be exactly the same with discarding the 
-    //pixels intersecting the Wgs84 globe
-    v_positionWC = (czm_model * position).xyz;
-    v_positionEC = (czm_modelView * position).xyz;
-    v_normalEC = czm_normal * normal;
+  //Use regular transformation to trick the sensor into thinking its in 3d space
+  //The fragment calculation turns out to be exactly the same with discarding the
+  //pixels intersecting the Wgs84 globe
+  v_positionWC = projected_world_pos.xyz;
+  v_positionEC = (czm_view * vec4(projected_world_pos, 1.)).xyz;
+  v_normalEC = czm_normal * normal;
 }
