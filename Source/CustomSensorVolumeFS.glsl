@@ -81,7 +81,7 @@ void main()
 	    // PERFORMANCE_IDEA: A coarse check for ellipsoid intersection could be done on the CPU first.
 	    if (ellipsoidValue < 0.0)
 	    {
-            discard;
+                discard;
 	    }
 
 	    // Discard if in the sensor's shadow

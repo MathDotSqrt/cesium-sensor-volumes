@@ -233,7 +233,10 @@ define([
             },
             u_normalDirection : function() {
                 return 1.0;
-            }
+            },
+	    u_model : function() {
+	    	return that.modelMatrix;
+	    }
         };
 
         this._mode = SceneMode.SCENE2D;
@@ -363,7 +366,6 @@ define([
      */
     CustomSensorVolume.prototype.update = function(frameState) {
         this._mode = frameState.mode;
-	console.log(frameState.mode);
         //if (!this.show || this._mode !== SceneMode.SCENE3D) {
         if (!this.show) {
 	    return;
@@ -408,10 +410,10 @@ define([
                         face : CullFace.BACK
                     }
                 });
-
+			
                 this._frontFaceColorCommand.renderState = rs;
                 this._frontFaceColorCommand.pass = Pass.TRANSLUCENT;
-
+		console.log(this._frontFaceColorCommand);
                 rs = RenderState.fromCache({
                     depthTest : {
                         enabled : !this.showThroughEllipsoid
@@ -481,7 +483,12 @@ define([
         }
 
         if (directionsChanged || modelMatrixChanged) {
-            BoundingSphere.transform(this._boundingSphere, this.modelMatrix, this._boundingSphereWC);
+	    //CHRIS TRENKOV
+	    //Set bounding sphere to large radius to prevent cesium from culling it 
+	    //in 2D view
+            this._boundingSphere.radius = 100000000;
+	    BoundingSphere.transform(this._boundingSphere, this.modelMatrix, this._boundingSphereWC);
+	    console.log(this._boundingSphereWC);
         }
 
         this._frontFaceColorCommand.modelMatrix = this.modelMatrix;
