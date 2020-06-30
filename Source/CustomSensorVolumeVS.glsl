@@ -45,8 +45,8 @@ vec3 ecef2all(vec3 ecef){
 }
 
 vec3 computeEquirectangular(vec3 world_pos){
-	vec3 origin = czm_model[3].xyz;
-	vec3 all_origin = ecef2all(origin);
+	vec3 origin = czm_model[3].xyz / czm_model[3].w;
+	float origin_lon = atan(origin.y, origin.x);
 
 	vec3 all = ecef2all(world_pos);
 	float alt = all.x;
@@ -55,10 +55,15 @@ vec3 computeEquirectangular(vec3 world_pos){
 
 	float lon_right = mod(lon, czm_twoPi);
 	float lon_left = lon_right - czm_twoPi;
+	if(origin_lon > 1.){
+		lon = lon_right;
+	}
+	if(origin_lon < -1.){
+		lon = lon_left;
+	}
 
-	lon = origin.y > 3. ? lon_right : lon;
-	lon = origin.y < -3. ? lon_left : lon;
 
+	//lon = origin.y < 6.1 && origin.y > -6.1 ? all.y : lon;
 	return vec3(alt, lon * EARTH_RADIUS_MAX, lat * EARTH_RADIUS_MAX);
 }
 
@@ -73,7 +78,7 @@ vec3 computeScenePosition(vec3 world_pos){
 }
 
 vec3 projectPointOnEllipsoid(vec3 world_pos){
-	vec3 sensor_origin_wc = czm_model[3].xyz;
+	vec3 sensor_origin_wc = czm_model[3].xyz / czm_model[3].w;
 
 	//http://www.ambrsoft.com/TrigoCalc/Sphere/SpherLineIntersection_.htm
 	vec3 slope = world_pos - sensor_origin_wc;
