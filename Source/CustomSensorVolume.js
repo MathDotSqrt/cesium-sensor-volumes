@@ -260,7 +260,10 @@ define([
     var n1Scratch = new Cartesian3();
     var n2Scratch = new Cartesian3();
     function computePositions(customSensorVolume) {
-        var directions = customSensorVolume._directions;
+        var directions = customSensorVolume._directions
+          .filter(function(dir){
+            return dir !== null;  //remove sentinel for this function 
+          });
         var length = directions.length;
         var positions = new Float32Array(3 * length);
         var r = isFinite(customSensorVolume.radius) ? customSensorVolume.radius : FAR;
