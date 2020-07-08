@@ -410,10 +410,10 @@ define([
                         face : CullFace.BACK
                     }
                 });
-			
+
                 this._frontFaceColorCommand.renderState = rs;
                 this._frontFaceColorCommand.pass = Pass.TRANSLUCENT;
-		console.log(this._frontFaceColorCommand);
+
                 rs = RenderState.fromCache({
                     depthTest : {
                         enabled : !this.showThroughEllipsoid
@@ -483,12 +483,11 @@ define([
         }
 
         if (directionsChanged || modelMatrixChanged) {
-	    //CHRIS TRENKOV
-	    //Set bounding sphere to large radius to prevent cesium from culling it 
-	    //in 2D view
+      	    //CHRIS TRENKOV
+      	    //Set bounding sphere to large radius to prevent cesium from culling it
+      	    //in 2D view
             this._boundingSphere.radius = 100000000;
-	    BoundingSphere.transform(this._boundingSphere, this.modelMatrix, this._boundingSphereWC);
-	    console.log(this._boundingSphereWC);
+      	    BoundingSphere.transform(this._boundingSphere, this.modelMatrix, this._boundingSphereWC);
         }
 
         this._frontFaceColorCommand.modelMatrix = this.modelMatrix;

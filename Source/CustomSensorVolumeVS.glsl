@@ -5,7 +5,7 @@ varying vec3 v_positionWC;
 varying vec3 v_positionEC;
 varying vec3 v_normalEC;
 
-const float EARTH_RADIUS_MAX = 6378137.;	//max radius of the earth
+const float EARTH_RADIUS_MAX = 6378137.;			//max radius of the earth
 const float EARTH_RADIUS_MIN = 6356752.314; 	//min radius of the earth
 
 //https://www.mathworks.com/matlabcentral/fileexchange/7941-convert-cartesian-ecef-coordinates-to-lat-lon-alt
@@ -38,42 +38,58 @@ vec3 ecef2all(vec3 ecef){
 
 	float alt = p / cos(lat) - N;
 
-	//lon = mod(lon, czm_twoPi);
-
-	const float PI = 3.14159;
 	return vec3(alt, lon, lat);
 }
 
-vec3 computeEquirectangular(vec3 world_pos){
+float wrapLon(float lon){
 	vec3 origin = czm_model[3].xyz / czm_model[3].w;
+
+	//longitude of the center of the sensor
 	float origin_lon = atan(origin.y, origin.x);
 
+	float lon_right = mod(lon, czm_twoPi);
+	float lon_left = lon_right - czm_twoPi;
+
+	if(origin_lon > 1.){
+		return lon_right;
+	}
+	if(origin_lon < -1.){
+		return lon_left;
+	}
+
+	return lon;
+}
+
+vec3 computeEquirectangular(vec3 world_pos){
+	//converts earth centered earth fixed coordinates to
+	//geodetic altitude, longitude, latitude
 	vec3 all = ecef2all(world_pos);
 	float alt = all.x;
 	float lon = all.y;
 	float lat = all.z;
 
-	float lon_right = mod(lon, czm_twoPi);
-	float lon_left = lon_right - czm_twoPi;
-	if(origin_lon > 1.){
-		lon = lon_right;
-	}
-	if(origin_lon < -1.){
-		lon = lon_left;
-	}
+	//longitude normally has range of -pi, +pi
+	//but if sensor is at the edge of the 2d scene mapProjection
+	//parts of the sensor will tear
+	lon = wrapLon(lon);
 
+	//actual equirectangular projection
+	//TODO perform mercator projection as an option
+	vec3 projection = vec3(alt, lon * EARTH_RADIUS_MAX, lat * EARTH_RADIUS_MAX);
 
-	//lon = origin.y < 6.1 && origin.y > -6.1 ? all.y : lon;
-	return vec3(alt, lon * EARTH_RADIUS_MAX, lat * EARTH_RADIUS_MAX);
+	return projection;
 }
 
 vec3 computeScenePosition(vec3 world_pos){
 	if(czm_sceneMode == czm_sceneMode3D){
+		//scenemode: 3D position
 		return world_pos;
 	}
 
+	//sceneMode: 2D, Columbus position
 	vec3 projected_pos = computeEquirectangular(world_pos);
 
+	//interpolate between them during scene morph (scene mode transition)
 	return mix(projected_pos, world_pos, czm_morphTime);
 }
 
@@ -87,31 +103,39 @@ vec3 projectPointOnEllipsoid(vec3 world_pos){
 	float c = dot(sensor_origin_wc, sensor_origin_wc) - EARTH_RADIUS_MIN * EARTH_RADIUS_MIN;
 
 	float discriminant = b * b - 4. * a * c;
-	float t1 = (-b + sqrt(discriminant)) / (2. * a);
-	float t2 = (-b - sqrt(discriminant)) / (2. * a);
-	float t = min(t1, t2);	//slightly elongate to account for error
+	float sqrt_discriminant = sqrt(discriminant);
+	float t1 = (-b + sqrt_discriminant) / (2. * a);
+	float t2 = (-b - sqrt_discriminant) / (2. * a);
+	float t = min(t1, t2);
 
 	vec3 projected_point = sensor_origin_wc + slope * t;
-	//if a is 0 then it is the same point as sensor origin
-	bool is_intersecting = discriminant > 0.;
-	bool is_not_sensor_origin = a > .001;
 
+	//bool is_not_sensor_origin = a > .001;
+	bool is_intersecting = discriminant > 0.;
 	return is_intersecting && (t > 0.) ? projected_point : world_pos;
 }
 
 void main()
 {
 	vec4 world_pos = czm_model * position;
-	vec3 projected_world_pos = projectPointOnEllipsoid(world_pos.xyz);
-  vec3 scene_wc = computeScenePosition(projected_world_pos);
 
+	//if poisition intersects the earth, project position onto surface
+	//of the ellipsoid.
+	//Slight performance boost because fragment shader will have to cull
+	//fewer pixels.
+	//This also aids with the accuracy of the 2d projection
+	vec3 projected_world_pos = projectPointOnEllipsoid(world_pos.xyz);
+
+	//computes position with respect to cesium's scene mode 3d, 2d,
+	//columbus, and morph
+  vec3 scene_wc = computeScenePosition(projected_world_pos);
 
   gl_Position = czm_viewProjection * vec4(scene_wc, 1.);
 
-  //Use regular transformation to trick the sensor into thinking its in 3d space
-  //The fragment calculation turns out to be exactly the same with discarding the
-  //pixels intersecting the Wgs84 globe
-  v_positionWC = projected_world_pos.xyz;
+  //Use regular transformation to trick the sensor into thinking its in 3d scene mode
+  //The fragment calculation for discarding intersecting pixels
+  //with the Wgs84 globe is the same in all scene modes
+  v_positionWC = projected_world_pos;
   v_positionEC = (czm_view * vec4(projected_world_pos, 1.)).xyz;
   v_normalEC = czm_normal * normal;
 }
