@@ -248,8 +248,10 @@ define([
                 return this._directions;
             },
             set : function(value) {
-                this._directions = value;
-                this._directionsDirty = true;
+                if(this._directions !== value){
+                  this._directions = value;
+                  this._directionsDirty = true;
+                }
             }
         }
     });
@@ -282,7 +284,6 @@ define([
 
             boundingVolumePositions.push(p);
         }
-
         BoundingSphere.fromPoints(boundingVolumePositions, customSensorVolume._boundingSphere);
 
         return positions;
