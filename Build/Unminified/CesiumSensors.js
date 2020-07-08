@@ -880,8 +880,10 @@ define('CustomSensorVolume',[
                 return this._directions;
             },
             set : function(value) {
-                this._directions = value;
-                this._directionsDirty = true;
+                if(this._directions !== value){
+                  this._directions = value;
+                  this._directionsDirty = true;
+                }
             }
         }
     });
@@ -889,71 +891,93 @@ define('CustomSensorVolume',[
     var n0Scratch = new Cartesian3();
     var n1Scratch = new Cartesian3();
     var n2Scratch = new Cartesian3();
+    function computeSubposition(directions, r){
+      const length = directions.length;
+      const positions = [];
+      for ( var i = length - 2, j = length - 1, k = 0; k < length; i = j++, j = k++) {
+          // PERFORMANCE_IDEA:  We can avoid redundant operations for adjacent edges.
+          var n0 = Cartesian3.fromSpherical(directions[i], n0Scratch);
+          var n1 = Cartesian3.fromSpherical(directions[j], n1Scratch);
+          var n2 = Cartesian3.fromSpherical(directions[k], n2Scratch);
+
+          // Extend position so the volume encompasses the sensor's radius.
+          var theta = Math.max(Cartesian3.angleBetween(n0, n1), Cartesian3.angleBetween(n1, n2));
+          var distance = r / Math.cos(theta * 0.5);
+          var p = Cartesian3.multiplyByScalar(n1, distance, new Cartesian3());
+
+          positions.push(p);
+      }
+
+      return positions
+    }
+
     function computePositions(customSensorVolume) {
-        var directions = customSensorVolume._directions;
-        var length = directions.length;
-        var positions = new Float32Array(3 * length);
-        var r = isFinite(customSensorVolume.radius) ? customSensorVolume.radius : FAR;
+        const directions = customSensorVolume._directions;
+        const r = isFinite(customSensorVolume.radius) ? customSensorVolume.radius : FAR;
 
-        var boundingVolumePositions = [Cartesian3.ZERO];
+        const subdivide = directions.reduce(function(arr, element){
+          if(element === null) arr.push([]);
+          else arr[arr.length-1].push(element);
+          return arr;
+        }, [[]]);
 
-        for ( var i = length - 2, j = length - 1, k = 0; k < length; i = j++, j = k++) {
-            // PERFORMANCE_IDEA:  We can avoid redundant operations for adjacent edges.
-            var n0 = Cartesian3.fromSpherical(directions[i], n0Scratch);
-            var n1 = Cartesian3.fromSpherical(directions[j], n1Scratch);
-            var n2 = Cartesian3.fromSpherical(directions[k], n2Scratch);
+        const subdividedPositions = subdivide.map(function(subarray){
+          return computeSubposition(subarray, r);
+        });
 
-            // Extend position so the volume encompasses the sensor's radius.
-            var theta = Math.max(Cartesian3.angleBetween(n0, n1), Cartesian3.angleBetween(n1, n2));
-            var distance = r / Math.cos(theta * 0.5);
-            var p = Cartesian3.multiplyByScalar(n1, distance, new Cartesian3());
-
-            positions[(j * 3)] = p.x;
-            positions[(j * 3) + 1] = p.y;
-            positions[(j * 3) + 2] = p.z;
-
-            boundingVolumePositions.push(p);
-        }
+        const boundingVolumePositions = subdividedPositions
+          .flat()
+          .splice(0, 0, Cesium.Cartesian3.ZERO);
 
         BoundingSphere.fromPoints(boundingVolumePositions, customSensorVolume._boundingSphere);
 
-        return positions;
+        return subdividedPositions;
     }
 
     var nScratch = new Cartesian3();
+    function createSubvertexArray(positions){
+      const length = positions.length;
+      var vertices = [];
+
+      for ( var i = length - 1, j = 0; j < length; i = j++) {
+          var p0 = positions[i];
+          var p1 = positions[j];
+          var n = Cartesian3.normalize(Cartesian3.cross(p1, p0, nScratch), nScratch); // Per-face normals
+
+          vertices.push(0.0); // Sensor vertex
+          vertices.push(0.0);
+          vertices.push(0.0);
+          vertices.push(n.x);
+          vertices.push(n.y);
+          vertices.push(n.z);
+
+          vertices.push(p1.x);
+          vertices.push(p1.y);
+          vertices.push(p1.z);
+          vertices.push(n.x);
+          vertices.push(n.y);
+          vertices.push(n.z);
+
+          vertices.push(p0.x);
+          vertices.push(p0.y);
+          vertices.push(p0.z);
+          vertices.push(n.x);
+          vertices.push(n.y);
+          vertices.push(n.z);
+      }
+
+      return vertices;
+    }
+
     function createVertexArray(customSensorVolume, context) {
-        var positions = computePositions(customSensorVolume);
+        const directions = customSensorVolume._directions;
+        const positions = computePositions(customSensorVolume);
 
-        var length = customSensorVolume._directions.length;
-        var vertices = new Float32Array(2 * 3 * 3 * length);
-
-        var k = 0;
-        for ( var i = length - 1, j = 0; j < length; i = j++) {
-            var p0 = new Cartesian3(positions[(i * 3)], positions[(i * 3) + 1], positions[(i * 3) + 2]);
-            var p1 = new Cartesian3(positions[(j * 3)], positions[(j * 3) + 1], positions[(j * 3) + 2]);
-            var n = Cartesian3.normalize(Cartesian3.cross(p1, p0, nScratch), nScratch); // Per-face normals
-
-            vertices[k++] = 0.0; // Sensor vertex
-            vertices[k++] = 0.0;
-            vertices[k++] = 0.0;
-            vertices[k++] = n.x;
-            vertices[k++] = n.y;
-            vertices[k++] = n.z;
-
-            vertices[k++] = p1.x;
-            vertices[k++] = p1.y;
-            vertices[k++] = p1.z;
-            vertices[k++] = n.x;
-            vertices[k++] = n.y;
-            vertices[k++] = n.z;
-
-            vertices[k++] = p0.x;
-            vertices[k++] = p0.y;
-            vertices[k++] = p0.z;
-            vertices[k++] = n.x;
-            vertices[k++] = n.y;
-            vertices[k++] = n.z;
-        }
+        const vertices = positions.map(function(subarray){
+          return createSubvertexArray(subarray);
+        })
+        .flat();
+        console.log(vertices);
 
         var vertexBuffer = Buffer.createVertexBuffer({
             context: context,
