@@ -973,11 +973,8 @@ define('CustomSensorVolume',[
         const directions = customSensorVolume._directions;
         const positions = computePositions(customSensorVolume);
 
-        const vertices = positions.map(function(subarray){
-          return createSubvertexArray(subarray);
-        })
+        const vertices = positions.map(createSubvertexArray)
         .flat();
-        console.log(vertices);
 
         var vertexBuffer = Buffer.createVertexBuffer({
             context: context,
