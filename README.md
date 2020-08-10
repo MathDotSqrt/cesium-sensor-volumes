@@ -173,6 +173,7 @@ void main(){
 [Ellipsoid point projection](http://www.ambrsoft.com/TrigoCalc/Sphere/SpherLineIntersection_.htm) is an optimization for the 3D view and reduces distortion for the equirectangular projection.
 
 ```glsl
+const float EARTH_RADIUS_MAX = 6378137.;			//max radius of the earth
 const float EARTH_RADIUS_MIN = 6356752.314; 	//min radius of the earth
 ...
 vec3 projectPointOnEllipsoid(vec3 world_pos){
