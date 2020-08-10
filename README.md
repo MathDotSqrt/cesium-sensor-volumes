@@ -170,6 +170,34 @@ void main(){
   ...
 }
 ```
+[Ellipsoid point projection](http://www.ambrsoft.com/TrigoCalc/Sphere/SpherLineIntersection_.htm) is an optimization for the 3D view and reduces distortion for the equirectangular projection.
+
+```glsl
+const float EARTH_RADIUS_MIN = 6356752.314; 	//min radius of the earth
+...
+vec3 projectPointOnEllipsoid(vec3 world_pos){
+	vec3 sensor_origin_wc = czm_model[3].xyz / czm_model[3].w;
+
+	//http://www.ambrsoft.com/TrigoCalc/Sphere/SpherLineIntersection_.htm
+	vec3 slope = world_pos - sensor_origin_wc;
+	float a = dot(slope, slope);
+	float b = -2. * dot(slope, -sensor_origin_wc);
+	float c = dot(sensor_origin_wc, sensor_origin_wc) - EARTH_RADIUS_MIN * EARTH_RADIUS_MIN;
+
+	float discriminant = b * b - 4. * a * c;
+	float sqrt_discriminant = sqrt(discriminant);
+	float t1 = (-b + sqrt_discriminant) / (2. * a);
+	float t2 = (-b - sqrt_discriminant) / (2. * a);
+	float t = min(t1, t2);
+
+	vec3 projected_point = sensor_origin_wc + slope * t;
+
+	//bool is_not_sensor_origin = a > .001;
+	bool is_intersecting = discriminant > 0.;
+	return is_intersecting && (t > 0.) ? projected_point : world_pos;
+}
+```
+
 If scene mode is 3D no-op. If scene mode is 2D perform equirectangular projection.
 ```glsl
 vec3 computeScenePosition(vec3 world_pos){
@@ -207,7 +235,7 @@ vec3 computeEquirectangular(vec3 world_pos){
 	return projection;
 }
 ```
-Converts cartesian coordinates to altitude, longitude and latitude
+[`ecef2all`](https://www.mathworks.com/matlabcentral/fileexchange/7941-convert-cartesian-ecef-coordinates-to-lat-lon-alt) converts cartesian coordinates to altitude, longitude and latitude
 
 ``` glsl
 vec3 ecef2all(vec3 ecef){
