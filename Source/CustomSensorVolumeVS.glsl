@@ -119,7 +119,7 @@ void main()
 {
 	vec4 world_pos = czm_model * position;
 
-	//if poisition intersects the earth, project position onto surface
+	//if position intersects the earth, project position onto surface
 	//of the ellipsoid.
 	//Slight performance boost because fragment shader will have to cull
 	//fewer pixels.
