@@ -27,7 +27,12 @@ vec4 getColor(float sensorRadius, vec3 pointEC)
     materialInput.normalEC = u_normalDirection * normalEC;
 
     czm_material material = czm_getMaterial(materialInput);
+
+
     //return mix(czm_phong(normalize(positionToEyeEC), material,czm_lightDirectionEC), vec4(material.diffuse, material.alpha), 0.4);
+
+    //This breaks for newer versions of cesium. Use above commented line for newer versions of Cesium.
+    //czm_phong function signiture changes to take in czm_lightDirectionEC
     return mix(czm_phong(normalize(positionToEyeEC), material), vec4(material.diffuse, material.alpha), 0.4);
 }
 
