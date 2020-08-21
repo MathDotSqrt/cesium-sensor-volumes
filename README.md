@@ -7,6 +7,8 @@
 # Cesium Sensor Volumes
 > A Cesium plugin for visualizing sensor volumes in both 3D and 2D projections.
 
+**Version**: Built for *Cesium >= 1.62*. For versions < 1.62 use the `1.59` branch
+
 **License**: Apache 2.0.  Free for commercial and non-commercial use.  See [LICENSE.md](LICENSE.md).
 
 **Usage**
